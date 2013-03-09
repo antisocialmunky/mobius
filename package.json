@@ -1,0 +1,16 @@
+{
+  "name": "Mobius",
+  "version": "0.1.0",
+  "description": "Experimental Functional MBS Framework",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": "",
+  "author": "David Tai",
+  "license": "BSD",
+  "dependencies": {
+    "jqueryify": "~1.9.1",
+    "underscore": "~1.4.4"
+  }
+}

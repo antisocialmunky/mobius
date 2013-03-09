@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+		<title>Mobius Tests</title>
+		<!--Underscore-->
+		<script src="node_modules/underscore/underscore.js"></script>
+		<!--Jquery-->
+		<script src="node_modules/jqueryify/index.js"></script>
+		<!--Gaunt Classes-->
+		<script src="index.js"></script>
+	</head>
+	<body>
+		<p>Mobius</p>
+	<script type="text/javascript">
+		var render = function(model, selector, template, renderFunc){
+			if(!$.fn[renderFunc]) {
+				renderFunc = "html";
+			}
+			template = _.template(template);
+			var $el = $(selector);
+			$el[renderFunc](template({model:model}));
+			return $el;
+		};
+
+		var count = 0;
+		var counterFunc = function() {
+			return count++;
+		};
+
+		var nameFunc = function() {
+			return Math.random().toString(36).substring(7);
+		};
+
+		var rendersItem = Mobius.define(function(model, collectionId, itemId, nameGen, counter) {
+			var id = counter();
+			var message = nameFunc();
+			var $el = render(model, "#" + collectionId + " ul", "<li id = '" + itemId + id + "'>" + message + "</li>", "append");
+			this.$el = $el.find("#"+itemId + id);
+		}, "rendered");
+
+		var deletesSelf = Mobius.define(function() {
+			var $el = this.$el;
+			$el.on("click", function(){
+				$el.remove();
+			});
+		}, "rendered");
+
+		var Item = [rendersItem("todo", "todoItem", nameFunc, counterFunc), deletesSelf()];
+
+		var rendersItemCollection = Mobius.define(function(model, collectionId, collectionName){
+			render(model, "body", "<div id = '" + collectionId + "'><h1>" + collectionName + "</h1><span id = 'add'>Add+</span><ul></ul></div>");
+			$("#" + collectionId + " #add").on('click', function(){
+				Mobius({}, Item);
+			});
+		});
+
+		var ItemCollection = rendersItemCollection("todo", "Todos!");
+
+		Mobius({}, ItemCollection);
+		Mobius({}, Item);
+	</script>
+	</body>
+</html>
