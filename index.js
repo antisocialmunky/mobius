@@ -10,7 +10,8 @@
 	/**
 	 * Convert an object to a model
 	 *
-	 * @param ({}) javascript object to turn into a model
+	 * @param (Object) javascript object to turn into a model
+	 * @param (Object) a list of behaviors
 	 * @return (Model) an initialized model
 	 */
 	var mbs = function(object, behaviors) {
@@ -54,11 +55,11 @@
 			namespace = false;
 		}
 
-		// Pay no attention to the man behind the curtain!
+		// Pay no attention to the thunk behind the curtain!
 		var ret = function() {
 			var args = Array.prototype.slice.call(arguments);
 			return function(){
-				args.unshift(this.data);
+				args.unshift(this);
 				var func = function() {
 					var state = this.states;
 					if(namespace) {
@@ -80,6 +81,28 @@
 
 		ret.namespace = namespace;
 		return ret;
+	};
+
+	/**
+	 * Create a constructor with many behaviors
+	 *
+	 * @param (Object) javascript object filled with defaults
+	 * @param (Object) a list of behaviors
+	 * @return (Model) a constructor function
+	 */
+	var constructor = function (defaults, behaviors) {
+		var Type = function(object) {
+			var member;
+			for (member in defaults) {
+				object[member] = defaults[member];
+      }
+      for (member in object) {
+				this[member] = object[member];
+      }
+			mbs(this, behaviors);
+		};
+
+		return Type;
 	};
 
 	this.Mobius = mbs;
