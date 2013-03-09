@@ -32,33 +32,62 @@
 			return Math.random().toString(36).substring(7);
 		};
 
-		var rendersItem = Mobius.define(function(model, collectionId, itemId, nameGen, counter) {
-			var id = counter();
-			var message = nameFunc();
-			var $el = render(model, "#" + collectionId + " ul", "<li id = '" + itemId + id + "'>" + message + "</li>", "append");
-			this.$el = $el.find("#"+itemId + id);
-		}, "rendered");
+		var rendersItem = Mobius.define(function(model, options) {
+			var $el = render(model, "#" + options.rendersTo + " ul", "<li id = '" + options.id + model.id + "'>" + model.name + "</li>", "append");
+			this.$el = $el.find("#" + options.id + model.id);
+		});
 
-		var deletesSelf = Mobius.define(function() {
+		var deletesSelf = Mobius.define(function(model, options) {
 			var $el = this.$el;
+			var items = this.collection.items;
+			
 			$el.on("click", function(){
 				$el.remove();
-			});
-		}, "rendered");
-
-		var Item = [rendersItem("todo", "todoItem", nameFunc, counterFunc), deletesSelf()];
-
-		var rendersItemCollection = Mobius.define(function(model, collectionId, collectionName){
-			render(model, "body", "<div id = '" + collectionId + "'><h1>" + collectionName + "</h1><span id = 'add'>Add+</span><ul></ul></div>");
-			$("#" + collectionId + " #add").on('click', function(){
-				Mobius({}, Item);
+				for(var i = 0, len = items.length; i < len; i++) {
+					if(items[i] === model) {
+						items.splice(i, 1);
+					}
+				}
 			});
 		});
 
-		var ItemCollection = rendersItemCollection("todo", "Todos!");
+		var Item = function(itemCollection){
+			return [
+			rendersItem({
+				rendersTo: "todo", 
+				id: "todoItem"
+			}), 
+			deletesSelf()];
+		};
+		
+		var rendersItemCollection = Mobius.define(function(model, options){
+			render(model, "body", "<div id = '" + options.id + "'><h1>" + options.name + "</h1><input type='text' value='Do This!'><span id = 'add'>Add+</span><ul></ul></div>");
+			var items = model.items;
+			for(var i = 0, len = items.length; i < len; i++) {
+				Mobius(items[i], Item(model), {collection: model});
+			}
 
-		Mobius({}, ItemCollection);
-		Mobius({}, Item);
+			this.$el = $el =  $("#"+options.id);
+
+			$el.find("#add").on('click', function(){
+				var name = $el.find('input').val();
+				var item = {id: counterFunc(), name: name};
+				model.items.push(item);
+				Mobius(item, Item(model), {collection: model});
+			});
+		});
+
+		var ItemCollection = rendersItemCollection({
+			id: "todo", 
+			name: "Todos!"
+		});
+
+		Mobius({items:[
+			{id: counterFunc(), name: nameFunc()},
+			{id: counterFunc(), name: nameFunc()},
+			{id: counterFunc(), name: nameFunc()},
+			{id: counterFunc(), name: nameFunc()}
+			]}, ItemCollection);
 	</script>
 	</body>
 </html>

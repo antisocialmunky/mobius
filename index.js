@@ -1,26 +1,62 @@
 (function(){
 	var id = 0;
 
-	var Model = function(object){
-		this.data = object;
-		this.states = {};
-		this.behaviors = [];
+	var extend = function(dest, src) {
+		for (var member in src) {
+			dest[member] = src[member];
+    }	
+    return dest;
 	};
 
-	/**
-	 * Convert an object to a model
-	 *
-	 * @param (Object) javascript object to turn into a model
-	 * @param (Object) a list of behaviors
-	 * @return (Model) an initialized model
-	 */
-	var mbs = function(object, behaviors) {
-		var model = new Model(object);
-		var toString = {}.toString;
-		if(arguments.length > 2) {
-			behaviors = Array.prototype.slice.call(arguments);
-			behaviors.shift();
+	var construct = function(object, state){
+		this.data = object;
+		this.states = extend({}, state);
+		this.changeCbs = {};
+	};
+
+	var prototype = {
+		behaviors: [],
+		get: function(member) {
+			return this.data[member];
+		},
+		set: function(member, value) {
+			this.data[member] = value;
+			this.fireChange(member, value);
+		},
+		onChange: function(member, callBack) {
+			var cbs = this.changeCbs[member];
+			if(!cbs) {
+				this.changeCbs[member] = [callBack];
+			} else {
+				cbs.push(callBack);
+			}
+		},
+		offChange: function(member, callBack) {
+			var cbs = this.changeCbs[member];
+			if(cbs) {
+				for(var i = 0, len = cbs.length; i < len; i++) {
+					if(cbs[i] === callBack) {
+						cbs.splice(i, 1);
+					}
+				}
+			}
+		},
+		fireChange: function(member, value) {
+			var cbs = this.changeCbs[member];
+			if(cbs) {
+				for(var i = 0, len = cbs.length; i < len; i++) {
+					cbs[i](member, value);
+				}
+			}
 		}
+	};
+
+	prototype.g = prototype.get;
+	prototype.s = prototype.set;
+
+	var toString = {}.toString;
+
+	var applyBehaviors = function(model, behaviors) {	
 		console.log(toString.call(behaviors));
 		if(toString.call(behaviors) === '[object Function]'){
 			behaviors.call(model);
@@ -36,7 +72,32 @@
 					behaviors[i].call(model);
 				}
 			}
-		}
+		}		
+		return model;
+	};
+
+	var extendModel = function() {
+		var NewModel = function() {
+			construct.apply(this, arguments);
+		};
+		extend(NewModel.prototype, prototype);
+		NewModel.prototype.class = NewModel;
+
+		return NewModel;
+	};
+
+	/**
+	 * Convert an object to a model
+	 *
+	 * @param (Object) javascript object to turn into a model
+	 * @param (Object) a list of behaviors
+	 * @return (Model) an initialized model
+	 */
+	var mbs = function(object, behaviors, state) {
+		var NewModel = extendModel();
+
+		var model = new NewModel(object, state);
+		applyBehaviors(model, behaviors, state);
 		return model;
 	};
 
@@ -59,7 +120,7 @@
 		var ret = function() {
 			var args = Array.prototype.slice.call(arguments);
 			return function(){
-				args.unshift(this);
+				args.unshift(this.data);
 				var func = function() {
 					var state = this.states;
 					if(namespace) {
@@ -71,13 +132,11 @@
 					} 
 					behavior.apply(state, args);
 				};
-				this.behaviors.push(func);
+				this.class.prototype.behaviors.push(func);
 				func.call(this);
 				args.shift();
 			};
 		};
-
-		Model.prototype[name] = ret;
 
 		ret.namespace = namespace;
 		return ret;
@@ -90,21 +149,35 @@
 	 * @param (Object) a list of behaviors
 	 * @return (Model) a constructor function
 	 */
-	var constructor = function (defaults, behaviors) {
-		var Type = function(object) {
-			var member;
-			for (member in defaults) {
-				object[member] = defaults[member];
-      }
-      for (member in object) {
-				this[member] = object[member];
-      }
-			mbs(this, behaviors);
+	 /*
+	var constructor = function (defaults) {
+		
+		var args = Array.prototype.slice.call(arguments);
+		if(toString.call(defaults) === '[object Object]') {
+			args.shift();
+		} else {
+			defaults = {};
+		}
+
+		var NewModel = function(object) {
+			if(!object) { 
+				object = {};
+			}
+			construct.call(this, object);
+			extend(this.data, defaults);
+			extend(this.data, object);
+			args.unshift(this);
+			applyBehaviors.apply(this, args);
+			args.shift();
 		};
 
-		return Type;
-	};
+		extend(NewModel.prototype, prototype);
+		NewModel.prototype.class = NewModel;
+
+		return NewModel;
+	};*/
 
 	this.Mobius = mbs;
 	mbs.define = define;
+	//mbs.constructor = constructor;
 })(this);
