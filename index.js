@@ -8,9 +8,91 @@
     return dest;
 	};
 
+	var eventSplitter = /\s+(.+)/;
+
+	var bind = function(ctx, func){
+		return function(){
+			func.apply(ctx, arguments);
+		};
+	};
+
+	/**
+	 * Add Event to state.$el
+	 *
+	 * TODO: make this deffered and react to this.$el
+	 *
+	 * @param (Object) selector string in the form of "event selector"
+	 * @cb(function)
+	 */
+	var event = function(string, cb) {
+		if($ && this.el){
+			this.$el = $(this.el);
+		}
+		if(this.$el) {
+			var tokens = string.split(eventSplitter);
+			var event = tokens[0];
+			var selector;
+			if(tokens.length > 1) {
+				selector = tokens[1];
+			}
+
+			cb = bind(this, cb);
+			
+			if(selector) {
+				this.$el.on(event, selector, cb);
+			} else {
+				this.$el.on(event, cb);
+			}
+		}
+	};
+
+	var events = {};
+
+	var makeSub = function(ref) {
+		var sub = function(eventName, cb) {
+			var ctx = ref.states;
+			var cbs = events[eventName];
+			if (cbs) {
+				cbs.push({cb: cb, ref: ref, ctx: ctx});
+			} else {
+				events[eventName] = [{cb: cb, ref: ref, ctx: ctx}];
+			}
+		};
+
+		return sub;
+	};
+
+	var pub = function(eventName, args, ref) {
+		var cbs = events[eventName];
+		var i, len, cb;
+		
+		if(toString.call(args) !== '[object Array]') {
+			args = [args];
+		}
+		
+		if(cbs) {
+			if (ref) {
+				for(i = 0, len = cbs.length; i < len; i++){
+					cb = cbs[i];
+					cb.cb.apply(cb.ctx, args);
+				}
+			} else {
+				for(i = 0, len = cbs.length; i < len; i++){
+					cb = cbs[i];
+					if(ref === cb.ref) {
+						cb.cb.apply(cb.ctx, args);
+					}
+				}
+			}
+		}
+	};
+
 	var construct = function(object, state){
 		this.data = object;
 		this.states = extend({}, state);
+		this.states.event = event;
+		this.states.pub = pub;
+		this.states.sub = makeSub(this);
 		this.changeCbs = {};
 	};
 
