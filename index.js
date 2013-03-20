@@ -25,25 +25,32 @@
 	 * @cb(function)
 	 */
 	var event = function(string, cb) {
-		if($ && this.el){
-			this.$el = $(this.el);
+		var tokens = string.split(eventSplitter);
+		var event = tokens[0];
+		var selector = tokens[1];
+		if(event === "timeout") {
+			return setTimeout(cb, selector);
+		} else if(event === "interval") {
+			return setInterval(cb, selector);
 		}
-		if(this.$el) {
-			var tokens = string.split(eventSplitter);
-			var event = tokens[0];
-			var selector;
-			if(tokens.length > 1) {
-				selector = tokens[1];
+		else if ($) {
+			if(this.selector) {
+				this.$el = $(this.selector);
 			}
-
-			cb = bind(this, cb);
-			
-			if(selector) {
-				this.$el.on(event, selector, cb);
-			} else {
-				this.$el.on(event, cb);
+			else if(this.el){
+				this.$el = $(this.el);
+			}
+			if(this.$el) {
+				cb = bind(this, cb);
+				
+				if(selector) {
+					this.$el.on(event, selector, cb);
+				} else {
+					this.$el.on(event, cb);
+				}
 			}
 		}
+		this._events[string] = cb;
 	};
 
 	var events = {};
@@ -87,25 +94,30 @@
 		}
 	};
 
-	var construct = function(object, state){
+	var createGetterAndSetter = function(object, prop) {
+		Object.defineProperty(object, prop, {
+			get: function() {
+				return this.data[prop];
+			},
+			set: function(value) {
+				this.data[prop] = value;
+				this._fireChange(prop, value);
+			}
+		});
+	};
+
+	var Data = function(object) {
 		this.data = object;
-		this.states = extend({}, state);
-		this.states.event = event;
-		this.states.pub = pub;
-		this.states.sub = makeSub(this);
+		for(var prop in object) {
+			if(object.hasOwnProperty(prop)) { 
+				createGetterAndSetter(this, prop);
+			}
+		}
 		this.changeCbs = {};
 	};
 
-	var prototype = {
-		behaviors: [],
-		get: function(member) {
-			return this.data[member];
-		},
-		set: function(member, value) {
-			this.data[member] = value;
-			this.fireChange(member, value);
-		},
-		onChange: function(member, callBack) {
+	Data.prototype = {
+		_onChange: function(member, callBack) {
 			var cbs = this.changeCbs[member];
 			if(!cbs) {
 				this.changeCbs[member] = [callBack];
@@ -113,7 +125,7 @@
 				cbs.push(callBack);
 			}
 		},
-		offChange: function(member, callBack) {
+		_offChange: function(member, callBack) {
 			var cbs = this.changeCbs[member];
 			if(cbs) {
 				for(var i = 0, len = cbs.length; i < len; i++) {
@@ -123,7 +135,7 @@
 				}
 			}
 		},
-		fireChange: function(member, value) {
+		_fireChange: function(member, value) {
 			var cbs = this.changeCbs[member];
 			if(cbs) {
 				for(var i = 0, len = cbs.length; i < len; i++) {
@@ -133,8 +145,16 @@
 		}
 	};
 
-	prototype.g = prototype.get;
-	prototype.s = prototype.set;
+	var construct = function(object, state){
+		var model = {};
+		model.data = new Data(object);
+		model.states = extend({_events: {}}, state);
+		model.states.event = event;
+		model.states.pub = pub;
+		model.states.sub = makeSub(model);
+		model.behaviors = [];
+		return model;
+	};
 
 	var toString = {}.toString;
 
@@ -142,12 +162,6 @@
 		console.log(toString.call(behaviors));
 		if(toString.call(behaviors) === '[object Function]'){
 			behaviors.call(model);
-		} else if(toString.call(behaviors) === '[object Object]'){
-			for(var behaviorName in behaviors) {
-				if(behaviors.hasOwnProperty(behaviorName) && toString.call(behaviors[behaviorName]) === '[object Function]') {
-					behaviors[behaviorName].call(model);
-				}
-			}
 		} else if(toString.call(behaviors) === '[object Array]'){
 			for(var i = 0, len = behaviors.length; i < len; i++) {
 				if(toString.call(behaviors[i]) === '[object Function]') {
@@ -158,16 +172,6 @@
 		return model;
 	};
 
-	var extendModel = function() {
-		var NewModel = function() {
-			construct.apply(this, arguments);
-		};
-		extend(NewModel.prototype, prototype);
-		NewModel.prototype.class = NewModel;
-
-		return NewModel;
-	};
-
 	/**
 	 * Convert an object to a model
 	 *
@@ -176,9 +180,7 @@
 	 * @return (Model) an initialized model
 	 */
 	var mbs = function(object, behaviors, state) {
-		var NewModel = extendModel();
-
-		var model = new NewModel(object, state);
+		var model = construct(object, state);
 		applyBehaviors(model, behaviors, state);
 		return model;
 	};
@@ -214,7 +216,7 @@
 					} 
 					behavior.apply(state, args);
 				};
-				this.class.prototype.behaviors.push(func);
+				this./*class.prototype.*/behaviors.push(func);
 				func.call(this);
 				args.shift();
 			};
@@ -224,42 +226,7 @@
 		return ret;
 	};
 
-	/**
-	 * Create a constructor with many behaviors
-	 *
-	 * @param (Object) javascript object filled with defaults
-	 * @param (Object) a list of behaviors
-	 * @return (Model) a constructor function
-	 */
-	 /*
-	var constructor = function (defaults) {
-		
-		var args = Array.prototype.slice.call(arguments);
-		if(toString.call(defaults) === '[object Object]') {
-			args.shift();
-		} else {
-			defaults = {};
-		}
-
-		var NewModel = function(object) {
-			if(!object) { 
-				object = {};
-			}
-			construct.call(this, object);
-			extend(this.data, defaults);
-			extend(this.data, object);
-			args.unshift(this);
-			applyBehaviors.apply(this, args);
-			args.shift();
-		};
-
-		extend(NewModel.prototype, prototype);
-		NewModel.prototype.class = NewModel;
-
-		return NewModel;
-	};*/
-
 	this.Mobius = mbs;
 	mbs.define = define;
-	//mbs.constructor = constructor;
-})(this);
+	this.Mobius.Framework = {};
+}).call(this);

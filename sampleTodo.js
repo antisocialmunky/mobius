@@ -1,12 +1,6 @@
 (function(){
-	var render = function(model, selector, template, renderFunc){
-		if(!$.fn[renderFunc]) {
-			renderFunc = "html";
-		}
-		template = _.template(template);
-		var $el = $(selector);
-		$el[renderFunc](template({model:model}));
-		return $el;
+	var render = function(model, template) {
+		return _.template(template)({model:model});
 	};
 
 	var count = 0;
@@ -19,27 +13,29 @@
 	};
 
 	var isPopup = Mobius.define(function(model, options) {
-		var $el = render(model, "<div></div>", "Are You Sure?<span class='confirm'>Yes</span><span class ='refuse'>No</span>");
-		this.$el = $el;
+		var html = render(model, "<div>Are You Sure?<span class='confirm'>Yes</span><span class ='refuse'>No</span></div>");
+		this.$el = $(html);
 		this.sub("ShowPopup", function(cb) {
-			$('body').append(this.$el);
+			Mobius.Framework.Render.appendTo(this.$el, "body");
 			this.cb = cb;
 		});
 
 		this.event("click .confirm", function() {
 			this.cb(true);
-			this.$el.detach();
+			Mobius.Framework.Render.remove(this.$el);
 		});
 
 		this.event("click .refuse", function(){
 			this.cb(false);
-			this.$el.detach();
+			Mobius.Framework.Render.remove(this.$el);
 		});
 	});
 
 	var rendersItem = Mobius.define(function(model, options) {
-		var $el = render(model, "#" + options.rendersTo + " ul", "<li id = '" + options.id + model.id + "'>" + model.name + "</li>", "append");
-		this.$el = $el.find("#" + options.id + model.id);
+		var html = render(model, "<li id = '" + options.id + model.id + "'>" + model.name + "</li>");
+		this.$el = $(html);
+		Mobius.Framework.Render.appendTo(this.$el, "#" + options.rendersTo + " ul");
+		this.$el.find("#" + options.id + model.id);
 	});
 
 	var deletesSelf = Mobius.define(function(model, options) {
@@ -51,7 +47,7 @@
 
 		var removeCB = function(confirm) {
 			if(confirm) {
-				$el.detach();
+				Mobius.Framework.Render.remove($el);
 				for(var i = 0, len = items.length; i < len; i++) {
 					if(items[i] === model) {
 						items.splice(i, 1);
@@ -83,18 +79,20 @@
 	};
 	
 	var rendersItemCollection = Mobius.define(function(model, options){
-		render(model, "body", "<div id = '" + options.id + "'><h1>" + options.name + "</h1><input type='text' value='Do This!'><span id = 'add'>Add+</span><ul></ul></div>");
+		var html = render(model, "<div id = '" + options.id + "'><h1>" + options.name + "</h1><input type='text' value='Do This!'><span id = 'add'>Add+</span><ul></ul></div>");
+		this.$el = $(html);
+
+		Mobius.Framework.Render.appendTo(this.$el, "body");
+
 		var items = model.items;
 		for(var i = 0, len = items.length; i < len; i++) {
 			Mobius(items[i], Item(model), {collection: model});
 		}
 
-		this.$el = $el =  $("#"+options.id);
-
 		this.event(
 			"click #add", 
 			function(){
-				var name = $el.find('input').val();
+				var name = this.$el.find('input').val();
 				var item = {id: counterFunc(), name: name};
 				model.items.push(item);
 				Mobius(item, Item(model), {collection: model});
