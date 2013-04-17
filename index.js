@@ -191,7 +191,7 @@
 		var model = new NewModel(object, state);
 		applyBehaviors(model, behaviors);
 		NewModel.prototype.behaviors = behaviors;
-		
+
 		return model;
 	};
 
@@ -256,6 +256,6 @@
 	mbs.define = define;
 })(this);
 
-if(module != null) {
-	module.exports = this.mbs;
+if(this.module != null) {
+	this.module.exports = this.mbs;
 }
