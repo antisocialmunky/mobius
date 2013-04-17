@@ -8,12 +8,6 @@
     return dest;
 	};
 
-	var construct = function(object, state){
-		this.data = object;
-		this.states = extend({}, state);
-		this.changeCbs = {};
-	};
-
 	var prototype = {
 		behaviors: [],
 		get: function(member) {
@@ -77,9 +71,12 @@
 	};
 
 	var extendModel = function() {
-		var NewModel = function() {
-			construct.apply(this, arguments);
+		var NewModel = function(object, state){
+			this.data = object;
+			this.states = extend({}, state);
+			this.changeCbs = {};
 		};
+
 		extend(NewModel.prototype, prototype);
 		NewModel.prototype.class = NewModel;
 
@@ -93,12 +90,25 @@
 	 * @param (Object) a list of behaviors
 	 * @return (Model) an initialized model
 	 */
-	var mbs = function(object, behaviors, state) {
+	var mbs = function (object, behaviors, state) {
 		var NewModel = extendModel();
 
 		var model = new NewModel(object, state);
-		applyBehaviors(model, behaviors, state);
+		applyBehaviors(model, behaviors);
+		NewModel.prototype.behaviors = behaviors;
 		return model;
+	};
+
+	var construct = function (objectDefaults, behaviors, stateDefaults) {
+		var NewModel = extendModel();
+		var NewNewModel = function(object, state) {
+			state = extend(stateDefaults.slice(0), state);
+			NewModel.call(this, object, state);
+			applyBehaviors(this, behaviors);
+		};
+		NewNewModel.prototype = NewModel.prototype;
+		NewNewModel.prototype.behaviors = behaviors;
+		return NewNewModel;
 	};
 
 	/**
@@ -132,7 +142,6 @@
 					} 
 					behavior.apply(state, args);
 				};
-				this.class.prototype.behaviors.push(func);
 				func.call(this);
 				args.shift();
 			};
@@ -142,42 +151,11 @@
 		return ret;
 	};
 
-	/**
-	 * Create a constructor with many behaviors
-	 *
-	 * @param (Object) javascript object filled with defaults
-	 * @param (Object) a list of behaviors
-	 * @return (Model) a constructor function
-	 */
-	 /*
-	var constructor = function (defaults) {
-		
-		var args = Array.prototype.slice.call(arguments);
-		if(toString.call(defaults) === '[object Object]') {
-			args.shift();
-		} else {
-			defaults = {};
-		}
-
-		var NewModel = function(object) {
-			if(!object) { 
-				object = {};
-			}
-			construct.call(this, object);
-			extend(this.data, defaults);
-			extend(this.data, object);
-			args.unshift(this);
-			applyBehaviors.apply(this, args);
-			args.shift();
-		};
-
-		extend(NewModel.prototype, prototype);
-		NewModel.prototype.class = NewModel;
-
-		return NewModel;
-	};*/
-
 	this.Mobius = mbs;
+	mbs.construct = construct;
 	mbs.define = define;
-	//mbs.constructor = constructor;
 })(this);
+
+if(module != null) {
+	module.exports = window.jQuery;
+}
